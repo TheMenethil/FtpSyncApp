@@ -24,8 +24,23 @@ public class SyncConfig
 
     /// <summary>
     /// Motifs d'exclusion (ex : "*.ini", "*.txt").
+    /// Ces fichiers ne sont ni comptés ni synchronisés.
     /// </summary>
     public List<string> ExcludedPatterns { get; } = new();
+
+    /// <summary>
+    /// Extensions de fichiers pour lesquelles on ne transfère pas le contenu réel,
+    /// mais où l'on crée un fichier distant "stub" (vide) portant le même nom.
+    /// Exemple : ".mp4", ".ts" pour l'intégration avec Bunny.net.
+    /// </summary>
+    public List<string> StubExtensions { get; } = new();
+
+    /// <summary>
+    /// Indique si la logique de création de fichiers stub est activée.
+    /// Si false, les fichiers correspondant à <see cref="StubExtensions"/>
+    /// sont traités comme des fichiers normaux (upload complet).
+    /// </summary>
+    public bool UseStubForExtensions { get; set; } = true;
 
     /// <summary>
     /// Indique si les fichiers présents sur le serveur mais absents en local

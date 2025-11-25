@@ -14,6 +14,13 @@ partial class MainForm
     private System.Windows.Forms.Label lblRemoteRoot;
     private System.Windows.Forms.TextBox txtRemoteRoot;
 
+    private System.Windows.Forms.GroupBox grpStubs;
+    private System.Windows.Forms.CheckBox chkUseStubs;
+    private System.Windows.Forms.ListBox lstStubExtensions;
+    private System.Windows.Forms.TextBox txtNewStubExtension;
+    private System.Windows.Forms.Button btnAddStub;
+    private System.Windows.Forms.Button btnRemoveStub;
+
     private System.Windows.Forms.GroupBox grpConnection;
     private System.Windows.Forms.Label lblHost;
     private System.Windows.Forms.TextBox txtHost;
@@ -25,6 +32,8 @@ partial class MainForm
     private System.Windows.Forms.TextBox txtPassword;
     private System.Windows.Forms.RadioButton rbSftp;
     private System.Windows.Forms.RadioButton rbFtp;
+
+    private System.Windows.Forms.CheckBox chkRememberPassword;
 
     private System.Windows.Forms.TreeView tvFolders;
 
@@ -102,6 +111,7 @@ partial class MainForm
         txtPort = new TextBox();
         lblHost = new Label();
         txtHost = new TextBox();
+        chkRememberPassword = new CheckBox();
         tvFolders = new TreeView();
         grpExcludes = new GroupBox();
         btnRemoveExclude = new Button();
@@ -136,12 +146,19 @@ partial class MainForm
         colActionErr = new ColumnHeader();
         colStatusErr = new ColumnHeader();
         btnExportLogs = new Button();
+        grpStubs = new GroupBox();
+        btnRemoveStub = new Button();
+        btnAddStub = new Button();
+        txtNewStubExtension = new TextBox();
+        lstStubExtensions = new ListBox();
+        chkUseStubs = new CheckBox();
         grpConnection.SuspendLayout();
         grpExcludes.SuspendLayout();
         tabLogs.SuspendLayout();
         tabInfos.SuspendLayout();
         tabWarnings.SuspendLayout();
         tabErrors.SuspendLayout();
+        grpStubs.SuspendLayout();
         SuspendLayout();
         // 
         // lblLocalRoot
@@ -202,9 +219,10 @@ partial class MainForm
         grpConnection.Controls.Add(txtPort);
         grpConnection.Controls.Add(lblHost);
         grpConnection.Controls.Add(txtHost);
+        grpConnection.Controls.Add(chkRememberPassword);
         grpConnection.Location = new Point(512, 80);
         grpConnection.Name = "grpConnection";
-        grpConnection.Size = new Size(294, 160);
+        grpConnection.Size = new Size(294, 182);
         grpConnection.TabIndex = 5;
         grpConnection.TabStop = false;
         grpConnection.Text = "Connexion";
@@ -212,7 +230,7 @@ partial class MainForm
         // rbFtp
         // 
         rbFtp.AutoSize = true;
-        rbFtp.Location = new Point(190, 132);
+        rbFtp.Location = new Point(187, 155);
         rbFtp.Name = "rbFtp";
         rbFtp.Size = new Size(45, 19);
         rbFtp.TabIndex = 9;
@@ -224,7 +242,7 @@ partial class MainForm
         // 
         rbSftp.AutoSize = true;
         rbSftp.Checked = true;
-        rbSftp.Location = new Point(130, 132);
+        rbSftp.Location = new Point(127, 155);
         rbSftp.Name = "rbSftp";
         rbSftp.Size = new Size(51, 19);
         rbSftp.TabIndex = 8;
@@ -298,13 +316,24 @@ partial class MainForm
         txtHost.Size = new Size(180, 23);
         txtHost.TabIndex = 0;
         // 
+        // chkRememberPassword
+        // 
+        chkRememberPassword.AutoSize = true;
+        chkRememberPassword.Location = new Point(19, 130);
+        chkRememberPassword.Name = "chkRememberPassword";
+        chkRememberPassword.Size = new Size(176, 19);
+        chkRememberPassword.TabIndex = 10;
+        chkRememberPassword.Text = "Se souvenir du mot de passe";
+        chkRememberPassword.UseVisualStyleBackColor = true;
+        chkRememberPassword.CheckedChanged += chkRememberPassword_CheckedChanged;
+        // 
         // tvFolders
         // 
-        tvFolders.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+        tvFolders.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         tvFolders.CheckBoxes = true;
         tvFolders.Location = new Point(12, 80);
         tvFolders.Name = "tvFolders";
-        tvFolders.Size = new Size(494, 260);
+        tvFolders.Size = new Size(494, 366);
         tvFolders.TabIndex = 6;
         tvFolders.AfterCheck += tvFolders_AfterCheck;
         // 
@@ -315,7 +344,7 @@ partial class MainForm
         grpExcludes.Controls.Add(btnAddExclude);
         grpExcludes.Controls.Add(txtNewExclude);
         grpExcludes.Controls.Add(lstExcludes);
-        grpExcludes.Location = new Point(512, 246);
+        grpExcludes.Location = new Point(512, 269);
         grpExcludes.Name = "grpExcludes";
         grpExcludes.Size = new Size(294, 194);
         grpExcludes.TabIndex = 7;
@@ -365,7 +394,7 @@ partial class MainForm
         // progressBarOverall
         // 
         progressBarOverall.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        progressBarOverall.Location = new Point(12, 350);
+        progressBarOverall.Location = new Point(12, 456);
         progressBarOverall.Name = "progressBarOverall";
         progressBarOverall.Size = new Size(494, 23);
         progressBarOverall.TabIndex = 8;
@@ -374,7 +403,7 @@ partial class MainForm
         // 
         lblProgress.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         lblProgress.AutoSize = true;
-        lblProgress.Location = new Point(12, 331);
+        lblProgress.Location = new Point(12, 437);
         lblProgress.Name = "lblProgress";
         lblProgress.Size = new Size(30, 15);
         lblProgress.TabIndex = 9;
@@ -383,35 +412,42 @@ partial class MainForm
         // btnDryRun
         // 
         btnDryRun.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        btnDryRun.Location = new Point(512, 446);
+        btnDryRun.BackColor = SystemColors.ControlDark;
+        btnDryRun.Cursor = Cursors.Help;
+        btnDryRun.ForeColor = SystemColors.ControlText;
+        btnDryRun.Location = new Point(519, 607);
         btnDryRun.Name = "btnDryRun";
         btnDryRun.Size = new Size(90, 27);
         btnDryRun.TabIndex = 10;
         btnDryRun.Text = "Simulation";
-        btnDryRun.UseVisualStyleBackColor = true;
+        btnDryRun.UseVisualStyleBackColor = false;
         btnDryRun.Click += btnDryRun_Click;
         // 
         // btnSync
         // 
         btnSync.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        btnSync.Location = new Point(608, 446);
+        btnSync.BackColor = SystemColors.ActiveCaption;
+        btnSync.Cursor = Cursors.Hand;
+        btnSync.Location = new Point(615, 607);
         btnSync.Name = "btnSync";
         btnSync.Size = new Size(90, 27);
         btnSync.TabIndex = 11;
         btnSync.Text = "Synchroniser";
-        btnSync.UseVisualStyleBackColor = true;
+        btnSync.UseVisualStyleBackColor = false;
         btnSync.Click += btnSync_Click;
         // 
         // btnCancel
         // 
         btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+        btnCancel.BackColor = SystemColors.Info;
+        btnCancel.Cursor = Cursors.No;
         btnCancel.Enabled = false;
-        btnCancel.Location = new Point(704, 446);
+        btnCancel.Location = new Point(711, 607);
         btnCancel.Name = "btnCancel";
         btnCancel.Size = new Size(90, 27);
         btnCancel.TabIndex = 12;
         btnCancel.Text = "Arrêter";
-        btnCancel.UseVisualStyleBackColor = true;
+        btnCancel.UseVisualStyleBackColor = false;
         btnCancel.Click += btnCancel_Click;
         // 
         // tabLogs
@@ -420,10 +456,10 @@ partial class MainForm
         tabLogs.Controls.Add(tabInfos);
         tabLogs.Controls.Add(tabWarnings);
         tabLogs.Controls.Add(tabErrors);
-        tabLogs.Location = new Point(12, 379);
+        tabLogs.Location = new Point(12, 485);
         tabLogs.Name = "tabLogs";
         tabLogs.SelectedIndex = 0;
-        tabLogs.Size = new Size(494, 152);
+        tabLogs.Size = new Size(494, 156);
         tabLogs.TabIndex = 13;
         // 
         // tabInfos
@@ -432,7 +468,7 @@ partial class MainForm
         tabInfos.Location = new Point(4, 24);
         tabInfos.Name = "tabInfos";
         tabInfos.Padding = new Padding(3);
-        tabInfos.Size = new Size(486, 124);
+        tabInfos.Size = new Size(486, 128);
         tabInfos.TabIndex = 0;
         tabInfos.Text = "Infos";
         tabInfos.UseVisualStyleBackColor = true;
@@ -445,10 +481,11 @@ partial class MainForm
         lvInfos.GridLines = true;
         lvInfos.Location = new Point(3, 3);
         lvInfos.Name = "lvInfos";
-        lvInfos.Size = new Size(480, 118);
+        lvInfos.Size = new Size(480, 122);
         lvInfos.TabIndex = 0;
         lvInfos.UseCompatibleStateImageBehavior = false;
         lvInfos.View = View.Details;
+        lvInfos.SelectedIndexChanged += lvInfos_SelectedIndexChanged;
         // 
         // colTimeInfo
         // 
@@ -478,7 +515,7 @@ partial class MainForm
         tabWarnings.Location = new Point(4, 24);
         tabWarnings.Name = "tabWarnings";
         tabWarnings.Padding = new Padding(3);
-        tabWarnings.Size = new Size(446, 124);
+        tabWarnings.Size = new Size(486, 124);
         tabWarnings.TabIndex = 1;
         tabWarnings.Text = "Avertissements";
         tabWarnings.UseVisualStyleBackColor = true;
@@ -491,7 +528,7 @@ partial class MainForm
         lvWarnings.GridLines = true;
         lvWarnings.Location = new Point(3, 3);
         lvWarnings.Name = "lvWarnings";
-        lvWarnings.Size = new Size(440, 118);
+        lvWarnings.Size = new Size(480, 118);
         lvWarnings.TabIndex = 0;
         lvWarnings.UseCompatibleStateImageBehavior = false;
         lvWarnings.View = View.Details;
@@ -524,7 +561,7 @@ partial class MainForm
         tabErrors.Location = new Point(4, 24);
         tabErrors.Name = "tabErrors";
         tabErrors.Padding = new Padding(3);
-        tabErrors.Size = new Size(446, 124);
+        tabErrors.Size = new Size(486, 124);
         tabErrors.TabIndex = 2;
         tabErrors.Text = "Erreurs";
         tabErrors.UseVisualStyleBackColor = true;
@@ -537,7 +574,7 @@ partial class MainForm
         lvErrors.GridLines = true;
         lvErrors.Location = new Point(3, 3);
         lvErrors.Name = "lvErrors";
-        lvErrors.Size = new Size(440, 118);
+        lvErrors.Size = new Size(480, 118);
         lvErrors.TabIndex = 0;
         lvErrors.UseCompatibleStateImageBehavior = false;
         lvErrors.View = View.Details;
@@ -567,7 +604,7 @@ partial class MainForm
         // btnExportLogs
         // 
         btnExportLogs.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        btnExportLogs.Location = new Point(12, 537);
+        btnExportLogs.Location = new Point(396, 640);
         btnExportLogs.Name = "btnExportLogs";
         btnExportLogs.Size = new Size(106, 27);
         btnExportLogs.TabIndex = 14;
@@ -575,18 +612,87 @@ partial class MainForm
         btnExportLogs.UseVisualStyleBackColor = true;
         btnExportLogs.Click += btnExportLogs_Click;
         // 
+        // grpStubs
+        // 
+        grpStubs.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        grpStubs.Controls.Add(btnRemoveStub);
+        grpStubs.Controls.Add(txtNewStubExtension);
+        grpStubs.Controls.Add(lstStubExtensions);
+        grpStubs.Controls.Add(chkUseStubs);
+        grpStubs.Location = new Point(512, 469);
+        grpStubs.Name = "grpStubs";
+        grpStubs.Size = new Size(294, 132);
+        grpStubs.TabIndex = 15;
+        grpStubs.TabStop = false;
+        grpStubs.Text = "Stub Bunny";
+        grpStubs.Enter += grpStubs_Enter_1;
+        // 
+        // btnRemoveStub
+        // 
+        btnRemoveStub.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+        btnRemoveStub.Location = new Point(303, 161);
+        btnRemoveStub.Name = "btnRemoveStub";
+        btnRemoveStub.Size = new Size(71, 23);
+        btnRemoveStub.TabIndex = 4;
+        btnRemoveStub.Text = "Supprimer";
+        btnRemoveStub.UseVisualStyleBackColor = true;
+        btnRemoveStub.Click += btnRemoveStub_Click;
+        // 
+        // btnAddStub
+        // 
+        btnAddStub.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+        btnAddStub.Location = new Point(526, 571);
+        btnAddStub.Name = "btnAddStub";
+        btnAddStub.Size = new Size(71, 23);
+        btnAddStub.TabIndex = 3;
+        btnAddStub.Text = "Ajouter";
+        btnAddStub.UseVisualStyleBackColor = true;
+        btnAddStub.Click += btnAddStub_Click;
+        // 
+        // txtNewStubExtension
+        // 
+        txtNewStubExtension.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        txtNewStubExtension.Location = new Point(14, 136);
+        txtNewStubExtension.Name = "txtNewStubExtension";
+        txtNewStubExtension.PlaceholderText = ".mp4";
+        txtNewStubExtension.Size = new Size(283, 23);
+        txtNewStubExtension.TabIndex = 2;
+        // 
+        // lstStubExtensions
+        // 
+        lstStubExtensions.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        lstStubExtensions.FormattingEnabled = true;
+        lstStubExtensions.Location = new Point(14, 47);
+        lstStubExtensions.Name = "lstStubExtensions";
+        lstStubExtensions.Size = new Size(266, 49);
+        lstStubExtensions.TabIndex = 1;
+        // 
+        // chkUseStubs
+        // 
+        chkUseStubs.AutoSize = true;
+        chkUseStubs.Checked = true;
+        chkUseStubs.CheckState = CheckState.Checked;
+        chkUseStubs.Location = new Point(14, 22);
+        chkUseStubs.Name = "chkUseStubs";
+        chkUseStubs.Size = new Size(250, 19);
+        chkUseStubs.TabIndex = 0;
+        chkUseStubs.Text = "Créer un fichier distant vide pour ces types";
+        chkUseStubs.UseVisualStyleBackColor = true;
+        // 
         // MainForm
         // 
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
-        ClientSize = new Size(820, 576);
+        ClientSize = new Size(820, 682);
         Controls.Add(btnExportLogs);
+        Controls.Add(btnAddStub);
         Controls.Add(tabLogs);
         Controls.Add(btnCancel);
         Controls.Add(btnSync);
         Controls.Add(btnDryRun);
         Controls.Add(lblProgress);
         Controls.Add(progressBarOverall);
+        Controls.Add(grpStubs);
         Controls.Add(grpExcludes);
         Controls.Add(tvFolders);
         Controls.Add(grpConnection);
@@ -605,6 +711,8 @@ partial class MainForm
         tabInfos.ResumeLayout(false);
         tabWarnings.ResumeLayout(false);
         tabErrors.ResumeLayout(false);
+        grpStubs.ResumeLayout(false);
+        grpStubs.PerformLayout();
         ResumeLayout(false);
         PerformLayout();
     }

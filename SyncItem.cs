@@ -30,11 +30,6 @@ public class SyncItem
     public SyncAction Action { get; set; }
 
     /// <summary>
-    /// Statut d'exécution de l'action.
-    /// </summary>
-    public SyncStatus Status { get; set; } = SyncStatus.Pending;
-
-    /// <summary>
     /// Taille du fichier local (en octets).
     /// </summary>
     public long LocalSize { get; set; }
@@ -53,6 +48,22 @@ public class SyncItem
     /// Date de dernière modification distante (UTC).
     /// </summary>
     public DateTime? RemoteLastWriteUtc { get; set; }
+
+    /// <summary>
+    /// Indique si ce fichier doit être traité en "stub"
+    /// (c'est-à-dire : création d'un fichier distant VIDE avec le même nom,
+    /// sans upload du contenu local).
+    ///
+    /// Cette valeur est définie lors de la génération du plan de synchro
+    /// en fonction de <see cref="SyncConfig.StubExtensions"/> et
+    /// <see cref="SyncConfig.UseStubForExtensions"/>.
+    /// </summary>
+    public bool IsStub { get; set; } = false;
+
+    /// <summary>
+    /// Statut d'exécution de l'action.
+    /// </summary>
+    public SyncStatus Status { get; set; } = SyncStatus.Pending;
 
     /// <summary>
     /// Message d'erreur éventuel associé à l'action.

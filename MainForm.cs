@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Text.Json;
 
 namespace FtpSyncApp;
 
@@ -22,6 +23,11 @@ public partial class MainForm : Form
     {
         InitializeComponent();
         InitDefaultExcludes();
+        InitDefaultStubExtensions();
+
+        Load += MainForm_Load;
+        Shown += MainForm_Shown;
+        FormClosing += MainForm_FormClosing;
     }
 
     #region Journalisation (logs)
@@ -110,6 +116,140 @@ public partial class MainForm : Form
             Level = LogLevel.Info,
             Message = $"Résumé : {ok} ok, {failed} erreurs, {ignored} ignorés sur {total} fichiers."
         });
+    }
+
+    #endregion
+
+    #region SaveFile
+
+    /// <summary>
+    /// Méthode pour récupérer le chemin du fichier de settings
+    /// </summary>
+
+    private string GetSettingsFilePath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var folder = Path.Combine(appData, "FtpSyncApp");
+        if (!Directory.Exists(folder))
+        {
+            Directory.CreateDirectory(folder);
+        }
+
+        return Path.Combine(folder, "settings.json");
+    }
+
+    private void MainForm_Load(object? sender, EventArgs e)
+    {
+        LoadSettings();
+    }
+
+    private void MainForm_Shown(object? sender, EventArgs e)
+    {
+        var lastLocalRoot = txtLocalRoot.Text.Trim();
+
+        if (!string.IsNullOrEmpty(lastLocalRoot) && Directory.Exists(lastLocalRoot))
+        {
+            var result = MessageBox.Show(
+                "Voulez-vous charger le dernier dossier local ?",
+                "Dossier local",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
+
+            if (result == DialogResult.Yes)
+            {
+                LoadTreeView(lastLocalRoot);
+            }
+        }
+    }
+
+    private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
+    {
+        SaveSettings();
+    }
+
+    private void LoadSettings()
+    {
+        try
+        {
+            var path = GetSettingsFilePath();
+            if (!File.Exists(path))
+                return;
+
+            var json = File.ReadAllText(path);
+            var settings = JsonSerializer.Deserialize<AppSettings>(json);
+            if (settings == null)
+                return;
+
+            txtLocalRoot.Text = settings.LocalRoot ?? string.Empty;
+            txtRemoteRoot.Text = settings.RemoteRoot ?? string.Empty;
+
+            txtHost.Text = settings.Host ?? string.Empty;
+            txtPort.Text = settings.Port > 0 ? settings.Port.ToString() : "22";
+            txtUsername.Text = settings.Username ?? string.Empty;
+
+            // SFTP / FTP
+            rbSftp.Checked = settings.UseSftp;
+            rbFtp.Checked = !settings.UseSftp;
+
+            // Mot de passe
+            chkRememberPassword.Checked = settings.RememberPassword;
+            if (settings.RememberPassword && !string.IsNullOrEmpty(settings.Password))
+            {
+                txtPassword.Text = settings.Password;
+            }
+        }
+        catch
+        {
+            // En cas de problème (fichier corrompu, etc.), on ignore silencieusement.
+            // Option : ajouter un log si tu veux.
+        }
+    }
+    private void SaveSettings()
+    {
+        try
+        {
+            var settings = new AppSettings
+            {
+                LocalRoot = txtLocalRoot.Text.Trim(),
+                RemoteRoot = txtRemoteRoot.Text.Trim(),
+                Host = txtHost.Text.Trim(),
+                Username = txtUsername.Text.Trim(),
+                UseSftp = rbSftp.Checked,
+                RememberPassword = chkRememberPassword.Checked
+            };
+
+            if (int.TryParse(txtPort.Text, out var p) && p > 0)
+            {
+                settings.Port = p;
+            }
+            else
+            {
+                settings.Port = 22;
+            }
+
+            if (settings.RememberPassword)
+            {
+                settings.Password = txtPassword.Text;
+            }
+            else
+            {
+                settings.Password = null;
+            }
+
+            var path = GetSettingsFilePath();
+            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            File.WriteAllText(path, json);
+        }
+        catch
+        {
+            // Échec de sauvegarde : on ignore (pas bloquant pour l'utilisateur).
+            // Option : log erreur si tu veux.
+        }
     }
 
     #endregion
@@ -317,7 +457,7 @@ public partial class MainForm : Form
 
     #endregion
 
-    #region Exclusions de fichiers
+    #region Exclusions de fichiers / Stubs
 
     /// <summary>
     /// Initialise les motifs d'exclusion par défaut (*.ini, *.txt).
@@ -333,6 +473,25 @@ public partial class MainForm : Form
                 lstExcludes.Items.Add(pattern);
             }
         }
+    }
+
+    /// <summary>
+    /// Initialise les extensions stub par défaut (.mp4, .ts) utilisées
+    /// pour la création de fichiers distants vides (Bunny.net).
+    /// </summary>
+    private void InitDefaultStubExtensions()
+    {
+        var defaults = new[] { ".mp4", ".ts" };
+
+        foreach (var ext in defaults)
+        {
+            if (!lstStubExtensions.Items.Contains(ext))
+            {
+                lstStubExtensions.Items.Add(ext);
+            }
+        }
+
+        chkUseStubs.Checked = true;
     }
 
     private void btnAddExclude_Click(object sender, EventArgs e)
@@ -384,6 +543,13 @@ public partial class MainForm : Form
         foreach (var item in lstExcludes.Items)
         {
             config.ExcludedPatterns.Add(item?.ToString() ?? string.Empty);
+        }
+
+        // Stubs Bunny : extensions + activation
+        config.UseStubForExtensions = chkUseStubs.Checked;
+        foreach (var item in lstStubExtensions.Items)
+        {
+            config.StubExtensions.Add(item?.ToString() ?? string.Empty);
         }
 
         // Récupération des sous-dossiers cochés (chemins relatifs).
@@ -536,20 +702,43 @@ public partial class MainForm : Form
                                 dir = NormalizeRemote(dir);
 
                                 await client.EnsureDirectoryAsync(dir, _cts.Token);
-                                await client.UploadFileAsync(item.LocalFullPath!, item.RemoteFullPath, _cts.Token);
 
-                                item.Status = SyncStatus.Success;
-                                ok++;
-                                sequentialErrors = 0;
-
-                                AppendLog(new LogEntry
+                                if (item.IsStub && config.UseStubForExtensions)
                                 {
-                                    Level = LogLevel.Info,
-                                    Message = $"{item.Action} : {item.RelativePath}",
-                                    FilePath = item.LocalFullPath,
-                                    Action = item.Action,
-                                    Status = item.Status
-                                });
+                                    // Fichier traité en mode "stub" : on crée un fichier distant vide
+                                    await client.CreateEmptyFileAsync(item.RemoteFullPath, _cts.Token);
+
+                                    item.Status = SyncStatus.Success;
+                                    ok++;
+                                    sequentialErrors = 0;
+
+                                    AppendLog(new LogEntry
+                                    {
+                                        Level = LogLevel.Info,
+                                        Message = $"Stub créé (fichier vide) : {item.RelativePath}",
+                                        FilePath = item.RemoteFullPath,
+                                        Action = item.Action,
+                                        Status = item.Status
+                                    });
+                                }
+                                else
+                                {
+                                    // Comportement normal : upload du fichier local
+                                    await client.UploadFileAsync(item.LocalFullPath!, item.RemoteFullPath, _cts.Token);
+
+                                    item.Status = SyncStatus.Success;
+                                    ok++;
+                                    sequentialErrors = 0;
+
+                                    AppendLog(new LogEntry
+                                    {
+                                        Level = LogLevel.Info,
+                                        Message = $"{item.Action} : {item.RelativePath}",
+                                        FilePath = item.LocalFullPath,
+                                        Action = item.Action,
+                                        Status = item.Status
+                                    });
+                                }
 
                                 break;
                             }
@@ -742,6 +931,49 @@ public partial class MainForm : Form
     }
 
     /// <summary>
+    /// Indique si un fichier doit être traité en "stub" (création de fichier distant vide)
+    /// en fonction des extensions configurées dans <see cref="SyncConfig.StubExtensions"/>.
+    /// </summary>
+    private bool IsStubFile(string? fullPath, SyncConfig config)
+    {
+        if (!config.UseStubForExtensions)
+            return false;
+
+        if (string.IsNullOrEmpty(fullPath))
+            return false;
+
+        var ext = Path.GetExtension(fullPath);
+        if (string.IsNullOrEmpty(ext))
+            return false;
+
+        ext = ext.ToLowerInvariant();
+
+        foreach (var raw in config.StubExtensions)
+        {
+            var pattern = raw?.Trim();
+            if (string.IsNullOrEmpty(pattern))
+                continue;
+
+            var normalized = pattern.ToLowerInvariant();
+
+            // Supporte ".mp4", "mp4", "*.mp4"
+            if (normalized.StartsWith("*."))
+            {
+                normalized = normalized[1..]; // ".mp4"
+            }
+            else if (!normalized.StartsWith("."))
+            {
+                normalized = "." + normalized; // "mp4" -> ".mp4"
+            }
+
+            if (ext == normalized)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Construit une map "chemin relatif → info distante" à partir des chemins absolus.
     /// </summary>
     private Dictionary<string, RemoteFileInfo> BuildRemoteRelativeMap(
@@ -780,6 +1012,7 @@ public partial class MainForm : Form
         {
             var (full, size, lastUtc) = value;
             var remoteFull = $"{remoteRoot}/{rel}";
+            var isStub = IsStubFile(full, config);
 
             if (remoteFiles.TryGetValue(rel, out var remote))
             {
@@ -788,17 +1021,40 @@ public partial class MainForm : Form
 
                 if (sameSize && sameDate)
                 {
-                    plan.Add(new SyncItem
+                    if (isStub)
                     {
-                        RelativePath = rel,
-                        LocalFullPath = full,
-                        RemoteFullPath = remoteFull,
-                        LocalSize = size,
-                        LocalLastWriteUtc = lastUtc.ToUniversalTime(),
-                        RemoteSize = remote.Size,
-                        RemoteLastWriteUtc = remote.LastWriteTimeUtc,
-                        Action = SyncAction.Skip
-                    });
+                        // Mode stub activé : même si le fichier distant a la même taille/date
+                        // que le local (cas où tu as uploadé la vidéo en “normal”),
+                        // on veut revenir à un fichier stub (vide) côté serveur.
+                        plan.Add(new SyncItem
+                        {
+                            RelativePath = rel,
+                            LocalFullPath = full,
+                            RemoteFullPath = remoteFull,
+                            LocalSize = size,
+                            LocalLastWriteUtc = lastUtc.ToUniversalTime(),
+                            RemoteSize = remote.Size,
+                            RemoteLastWriteUtc = remote.LastWriteTimeUtc,
+                            Action = SyncAction.UploadUpdate, // => traité comme stub dans l'exécuteur
+                            IsStub = true
+                        });
+                    }
+                    else
+                    {
+                        // Comportement normal : on peut vraiment sauter ce fichier
+                        plan.Add(new SyncItem
+                        {
+                            RelativePath = rel,
+                            LocalFullPath = full,
+                            RemoteFullPath = remoteFull,
+                            LocalSize = size,
+                            LocalLastWriteUtc = lastUtc.ToUniversalTime(),
+                            RemoteSize = remote.Size,
+                            RemoteLastWriteUtc = remote.LastWriteTimeUtc,
+                            Action = SyncAction.Skip,
+                            IsStub = false
+                        });
+                    }
                 }
                 else
                 {
@@ -811,7 +1067,8 @@ public partial class MainForm : Form
                         LocalLastWriteUtc = lastUtc.ToUniversalTime(),
                         RemoteSize = remote.Size,
                         RemoteLastWriteUtc = remote.LastWriteTimeUtc,
-                        Action = SyncAction.UploadUpdate
+                        Action = SyncAction.UploadUpdate,
+                        IsStub = isStub
                     });
                 }
             }
@@ -824,7 +1081,8 @@ public partial class MainForm : Form
                     RemoteFullPath = remoteFull,
                     LocalSize = size,
                     LocalLastWriteUtc = lastUtc.ToUniversalTime(),
-                    Action = SyncAction.UploadNew
+                    Action = SyncAction.UploadNew,
+                    IsStub = isStub
                 });
             }
         }
@@ -848,7 +1106,8 @@ public partial class MainForm : Form
                     LocalLastWriteUtc = DateTime.MinValue,
                     RemoteSize = info.Size,
                     RemoteLastWriteUtc = info.LastWriteTimeUtc,
-                    Action = SyncAction.DeleteRemote
+                    Action = SyncAction.DeleteRemote,
+                    IsStub = false
                 });
             }
         }
@@ -869,6 +1128,33 @@ public partial class MainForm : Form
     private void btnCancel_Click(object sender, EventArgs e)
     {
         _cts?.Cancel();
+    }
+
+    // -------- Gestion des extensions Stub Bunny --------
+
+    private void btnAddStub_Click(object sender, EventArgs e)
+    {
+        var ext = txtNewStubExtension.Text.Trim();
+
+        if (string.IsNullOrWhiteSpace(ext))
+            return;
+
+        if (!ext.StartsWith("."))
+            ext = "." + ext;
+
+        if (!lstStubExtensions.Items.Contains(ext))
+            lstStubExtensions.Items.Add(ext);
+
+        txtNewStubExtension.Clear();
+    }
+
+    private void btnRemoveStub_Click(object sender, EventArgs e)
+    {
+        var selected = lstStubExtensions.SelectedItem;
+        if (selected != null)
+        {
+            lstStubExtensions.Items.Remove(selected);
+        }
     }
 
     #endregion
@@ -894,4 +1180,24 @@ public partial class MainForm : Form
     }
 
     #endregion
+
+    private void grpStubs_Enter(object sender, EventArgs e)
+    {
+
+    }
+
+    private void chkRememberPassword_CheckedChanged(object sender, EventArgs e)
+    {
+
+    }
+
+    private void lvInfos_SelectedIndexChanged(object sender, EventArgs e)
+    {
+
+    }
+
+    private void grpStubs_Enter_1(object sender, EventArgs e)
+    {
+
+    }
 }

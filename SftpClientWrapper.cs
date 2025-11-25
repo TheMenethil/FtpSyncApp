@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Renci.SshNet;
+using System.IO;
 
 namespace FtpSyncApp;
 
@@ -27,6 +28,12 @@ public interface IRemoteClient : IDisposable
     Task UploadFileAsync(string localPath, string remotePath, CancellationToken token);
     Task DeleteFileAsync(string remotePath, CancellationToken token);
     Task EnsureDirectoryAsync(string remoteDirectory, CancellationToken token);
+
+    /// <summary>
+    /// Crée un fichier distant VIDE.
+    /// Utilisé pour les “stubs” Bunny (extensions .mp4, .ts, etc.).
+    /// </summary>
+    Task CreateEmptyFileAsync(string remotePath, CancellationToken token);
 }
 
 /// <summary>
@@ -106,9 +113,14 @@ public sealed class SftpClientWrapper : IRemoteClient
 
         return Task.Run(() =>
         {
-            using var stream = System.IO.File.OpenRead(localPath);
-            // overwrite=true : on écrase systématiquement la version distante.
+            var info = new FileInfo(localPath);
+            using var stream = File.OpenRead(localPath);
+
+            // Upload (overwrite = true)
             _client.UploadFile(stream, normalizedRemote, true);
+
+            // On force la date distante à être la même que celle du fichier local
+            _client.SetLastWriteTime(normalizedRemote, info.LastWriteTimeUtc);
         }, token);
     }
 
@@ -116,7 +128,6 @@ public sealed class SftpClientWrapper : IRemoteClient
     public Task DeleteFileAsync(string remotePath, CancellationToken token)
     {
         var normalizedRemote = NormalizePath(remotePath);
-
         return Task.Run(() => _client.DeleteFile(normalizedRemote), token);
     }
 
@@ -139,6 +150,19 @@ public sealed class SftpClientWrapper : IRemoteClient
                     _client.CreateDirectory(current);
                 }
             }
+        }, token);
+    }
+
+    /// <inheritdoc />
+    public Task CreateEmptyFileAsync(string remotePath, CancellationToken token)
+    {
+        var normalized = NormalizePath(remotePath);
+
+        return Task.Run(() =>
+        {
+            // On crée un flux SFTP vide → fichier = 0 octet
+            using var stream = _client.Create(normalized);
+            // NE RIEN ÉCRIRE : stub Bunny
         }, token);
     }
 
